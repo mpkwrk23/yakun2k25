@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Results Portal — Premium</title>
+  <style>
+    :root{--bg:#f7fafc;--card:#ffffff;--muted:#6b7280;--accent:#0ea5a4}
+    *{box-sizing:border-box}
+    body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial; margin:0; background:var(--bg); color:#111827}
+    header{background:linear-gradient(90deg,#06b6d4, #0ea5a4); color:#fff; padding:18px}
+    .wrap{max-width:980px;margin:20px auto;padding:16px}
+    .card{background:var(--card);border-radius:12px;box-shadow:0 6px 20px rgba(15,23,42,0.06);padding:16px;margin-bottom:16px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    button{background:var(--accent);border:none;color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid rgba(14,165,164,0.15)}
+    input,select{padding:8px;border-radius:8px;border:1px solid #e5e7eb}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;border-bottom:1px solid #eef2f7;text-align:left}
+    th{background:#fbfdfe;color:#0f172a}
+    .muted{color:var(--muted)}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#ecfeff;color:#025; font-weight:600}
+    .danger{background:#fee2e2;color:#991b1b}
+    .actions{display:flex;gap:6px}
+    .small{font-size:13px}
+    .hidden{display:none}
+    .flex{display:flex}
+    .space-between{justify-content:space-between;align-items:center}
+    footer{max-width:980px;margin:20px auto;text-align:center;color:var(--muted);font-size:13px}
+    @media (max-width:640px){.controls{flex-direction:column;align-items:stretch}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap space-between" style="display:flex;align-items:center;">
+      <h1 style="margin:0;font-size:20px">Results Portal <small style="font-size:12px;opacity:.9">(Public / Premium / Admin)</small></h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="badge">Premium feature</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="card">
+      <div class="controls">
+        <div style="flex:1">
+          <label class="small muted">Search student (id or name)</label><br>
+          <input id="search" placeholder="Enter ID or name" oninput="render()" />
+        </div>
+        <div>
+          <label class="small muted">View</label><br>
+          <select id="viewSelect" onchange="render()">
+            <option value="public">Public (limited)</option>
+            <option value="premium">Premium (full marks)</option>
+          </select>
+        </div>
+        <div class="small">
+          <label class="small muted">Premium code</label><br>
+          <input id="premiumCode" placeholder="enter premium code" />
+        </div>
+        <div style="align-self:end">
+          <button onclick="unlockPremium()">Unlock</button>
+        </div>
+        <div style="align-self:end">
+          <button class="ghost" onclick="openAdminLogin()">Admin</button>
+        </div>
+      </div>
+      <div id="notice" class="muted small" style="margin-top:8px">Public view shows only the mark and position. Premium unlock allows CSV download.</div>
+    </div>
+
+    <div id="resultsCard" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0">Results</h2>
+        <div class="muted small">Showing <span id="count">0</span> rows</div>
+      </div>
+
+      <div id="tableWrap"></div>
+    </div>
+
+    <div id="adminPanel" class="card hidden">
+      <h3>Admin — Manage Results</h3>
+      <div class="muted small">Add new result or edit existing entries. Changes are stored in your browser (localStorage).</div>
+      <hr>
+      <form id="addForm" onsubmit="event.preventDefault(); saveEntry();">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="sid" placeholder="Student ID" required />
+          <input id="sname" placeholder="Student Name" required />
+          <input id="swing" placeholder="Wing" />
+          <input id="program" placeholder="Program Name" />
+          <input id="position" placeholder="Position (e.g. 1st)" />
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <input id="mark" placeholder="Mark" type="number" />
+        </div>
+        <div style="margin-top:8px">
+          <button type="submit">Save / Add</button>
+          <button type="button" class="ghost" onclick="clearForm()">Clear</button>
+          <button type="button" class="ghost danger" onclick="logoutAdmin()">Logout Admin</button>
+        </div>
+      </form>
+    </div>
+
+  </main>
+
+  <footer>
+    Sample single-file demo — save this file as <code>results.html</code> and open in your browser. Data is stored locally in your browser only.
+  </footer>
+
+  <!-- Admin login modal (simple) -->
+  
+    </div>
+  </div>
+
+<script>
+// Sample defaults
+const DEFAULT_ADMIN_PASSWORD = 'admin123';
+const DEFAULT_PREMIUM_CODE = 'PREMIUM2025';
+
+function storage(key, val){
+  if(val===undefined) return JSON.parse(localStorage.getItem(key) || 'null');
+  localStorage.setItem(key, JSON.stringify(val));
+}
+
+function ensureDefaults(){
+  if(!storage('adminPassword')) storage('adminPassword', DEFAULT_ADMIN_PASSWORD);
+  if(!storage('premiumCode')) storage('premiumCode', DEFAULT_PREMIUM_CODE);
+  if(!storage('results')){
+    // sample data
+    const sample = [
+      {id:'NXR-101',name:'Basil',wing:'Nexara',program:'Science',position:'1st',mark:92},
+      {id:'NXR-102',name:'Niyas M',wing:'Nexara',program:'Commerce',position:'2nd',mark:85},
+      {id:'ZNR-301',name:'Yasir',wing:'Zonara',program:'Humanities',position:'1st',mark:95},
+    ];
+    storage('results', sample);
+  }
+}
+
+let session = {isAdmin:false, isPremium:false};
+
+function openAdminLogin(){
+  const pass = prompt('Enter admin password');
+  if(pass === null) return;
+  const real = storage('adminPassword') || DEFAULT_ADMIN_PASSWORD;
+  if(pass === real){
+    session.isAdmin = true;
+    document.getElementById('adminPanel').classList.remove('hidden');
+    alert('Admin logged in');
+    render();
+  } else {
+    alert('Wrong password');
+  }
+}
+
+function closeAdminLogin(){ return; }
+
+function doAdminLogin(){ return; }
+function closeAdminLogin(){
+  document.getElementById('loginModal').classList.add('hidden');
+}
+
+function doAdminLogin(){
+  const val = document.getElementById('adminPass').value;
+  const real = storage('adminPassword') || DEFAULT_ADMIN_PASSWORD;
+  if(val === real){
+    session.isAdmin = true;
+    document.getElementById('loginModal').classList.add('hidden');
+    document.getElementById('adminPanel').classList.remove('hidden');
+    alert('Admin logged in');
+    render();
+  } else alert('Wrong password');
+}
+
+function logoutAdmin(){
+  session.isAdmin = false;
+  document.getElementById('adminPanel').classList.add('hidden');
+  alert('Admin logged out');
+}
+
+function unlockPremium(){
+  const code = document.getElementById('premiumCode').value.trim();
+  const real = storage('premiumCode') || DEFAULT_PREMIUM_CODE;
+  if(code === real){
+    session.isPremium = true;
+    alert('Premium unlocked — full marks visible');
+    render();
+  } else {
+    alert('Wrong premium code');
+  }
+}
+
+function getResults(){
+  return storage('results') || [];
+}
+
+function render(){
+  const query = document.getElementById('search').value.trim().toLowerCase();
+  const view = document.getElementById('viewSelect').value;
+  const results = getResults().filter(r => {
+    if(!query) return true;
+    return r.id.toLowerCase().includes(query) || r.name.toLowerCase().includes(query) || (r.wing||'').toLowerCase().includes(query);
+  });
+  document.getElementById('count').textContent = results.length;
+
+  const showFull = (view==='premium' && session.isPremium) || session.isAdmin;
+
+  let html = '<table><thead><tr>';
+  html += '<th>ID</th><th>Name</th><th>Wing</th><th>Program</th><th>Mark</th><th>Position</th>';
+  
+  if(session.isAdmin) html += '<th>Actions</th>';
+  html += '</tr></thead><tbody>';
+
+  results.forEach((r, idx) => {
+    const mark = Number(r.mark ?? 0);((a,b)=>a+(Number(b)||0),0);
+    html += `<tr><td>${r.id}</td><td>${r.name}</td><td>${r.wing||'-'}</td><td>${r.program||'-'}</td><td>${mark}</td><td>${r.position||'-'}</td>`;
+    if(showFull){
+      html += '<td>' + ((r.marks||[]).map((m,i)=>`S${i+1}: ${m}`).join(' | ') || '-') + '</td>';
+    }
+    if(session.isAdmin){
+      html += `<td class="actions">`;
+      html += `<button class="ghost" onclick="editEntry('${r.id.replace(/'/g,'\\\'')}')">Edit</button>`;
+      html += `<button class="ghost danger" onclick="deleteEntry('${r.id.replace(/'/g,'\\\'')}')">Delete</button>`;
+      html += `</td>`;
+    }
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  html += '<div style="margin-top:12px">';
+  if(showFull) html += '<button onclick="downloadCSV()">Download CSV</button> ';
+  html += '</div>';
+
+  document.getElementById('tableWrap').innerHTML = html;
+}
+
+function saveEntry(){
+  const id = document.getElementById('sid').value.trim();
+  const name = document.getElementById('sname').value.trim();
+  const wing = document.getElementById('swing').value.trim();
+  const pos = document.getElementById('position').value.trim();
+  const mark = Number(document.getElementById('mark').value||0);
+  if(!id || !name) return alert('ID and name required');
+  const arr = getResults();
+  const existing = arr.findIndex(x => x.id === id);
+  const program = document.getElementById('program').value.trim();
+  const entry = {id,name,wing,program,position:pos,mark};
+  if(existing>=0){ arr[existing] = entry; }
+  else arr.push(entry);
+  storage('results', arr);
+  alert('Saved');
+  clearForm();
+  render();
+}
+
+function editEntry(id){
+  const arr = getResults();
+  const r = arr.find(x=>x.id===id);
+  if(!r) return alert('Not found');
+  document.getElementById('sid').value = r.id;
+  document.getElementById('sname').value = r.name;
+  document.getElementById('swing').value = r.wing || '';
+  document.getElementById('position').value = r.position || '';
+  document.getElementById('program').value = r.program || '';
+  document.getElementById('mark').value = (r.marks && r.marks[0])||'';
+  document.getElementById('m2').value = (r.marks && r.marks[1])||'';
+  document.getElementById('m3').value = (r.marks && r.marks[2])||'';
+  document.getElementById('m4').value = (r.marks && r.marks[3])||'';
+  window.scrollTo({top:document.getElementById('adminPanel').offsetTop-20,behavior:'smooth'});
+}
+
+function deleteEntry(id){
+  if(!confirm('Delete entry '+id+' ?')) return;
+  let arr = getResults().filter(x=>x.id!==id);
+  storage('results', arr);
+  render();
+}
+
+function clearForm(){
+  ['sid','sname','swing','program','position','mark'].forEach(id=>document.getElementById(id).value='');
+}
+
+function downloadCSV(){
+  const arr = getResults();
+  if(!arr.length) return alert('No data');
+  let csv = 'id,name,wing,program,position,mark\n';
+  arr.forEach(r=>{
+    csv += `${r.id},"${r.name}","${r.wing||''}","${r.position||''}","${(r.marks||[]).join('|')}"\n`;
+  });
+  const blob = new Blob([csv],{type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'results.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+// init
+ensureDefaults();
+render();
+</script>
+</body>
+</html>
