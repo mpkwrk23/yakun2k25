@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Results Portal — Premium</title>
+  <title>Results Portal</title>
   <style>
     :root{--bg:#f7fafc;--card:#ffffff;--muted:#6b7280;--accent:#0ea5a4}
     *{box-sizing:border-box}
@@ -27,13 +27,14 @@
     .flex{display:flex}
     .space-between{justify-content:space-between;align-items:center}
     footer{max-width:980px;margin:20px auto;text-align:center;color:var(--muted);font-size:13px}
-    /* Existing mobile query for controls */
+    
+    /* Improved table responsiveness for smaller screens */
     @media (max-width:640px){
       .controls{flex-direction:column;align-items:stretch}
       .controls > div{width:100%;} /* Make control inputs full width */
       .controls input, .controls select {width:100%;}
+      .controls button {width:100%;} /* Make buttons full width in controls */
 
-      /* Improved table responsiveness for smaller screens */
       #resultsCard table, #resultsCard thead, #resultsCard tbody, #resultsCard th, #resultsCard td, #resultsCard tr {
         display: block;
       }
@@ -69,9 +70,8 @@
         border-bottom: none;
       }
       .actions { justify-content: flex-end; }
-    }
-    /* Admin form layout improvement for mobile */
-    @media (max-width:640px){
+
+      /* Admin form layout improvement for mobile */
       #addForm > div {
         display: block !important;
       }
@@ -79,17 +79,17 @@
         width: 100%;
         margin-bottom: 8px;
       }
+      #addForm input:last-child {
+        margin-bottom: 0;
+      }
     }
   </style>
 </head>
 <body>
   <header>
     <div class="wrap space-between" style="display:flex;align-items:center;">
-      <h1 style="margin:0;font-size:20px">Results Portal <small style="font-size:12px;opacity:.9">(Public / Premium / Admin)</small></h1>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div class="badge">Premium feature</div>
-      </div>
-    </div>
+      <h1 style="margin:0;font-size:20px">Results Portal <small style="font-size:12px;opacity:.9">(Public / Admin)</small></h1>
+          </div>
   </header>
 
   <main class="wrap">
@@ -99,25 +99,11 @@
           <label class="small muted">Search student (id or name)</label><br>
           <input id="search" placeholder="Enter ID or name" oninput="render()" />
         </div>
-        <div>
-          <label class="small muted">View</label><br>
-          <select id="viewSelect" onchange="render()">
-            <option value="public">Public (limited)</option>
-            <option value="premium">Premium (full marks)</option>
-          </select>
-        </div>
-        <div class="small">
-          <label class="small muted">Premium code</label><br>
-          <input id="premiumCode" placeholder="enter premium code" />
-        </div>
-        <div style="align-self:end">
-          <button onclick="unlockPremium()">Unlock</button>
-        </div>
-        <div style="align-self:end">
+                <div style="align-self:end">
           <button class="ghost" onclick="openAdminLogin()">Admin</button>
         </div>
       </div>
-      <div id="notice" class="muted small" style="margin-top:8px">Public view shows only total and position. Premium unlock will reveal subject-wise marks and download options.</div>
+      <div id="notice" class="muted small" style="margin-top:8px">All results show full subject-wise marks by default.</div>
     </div>
 
     <div id="resultsCard" class="card">
@@ -177,7 +163,7 @@
 <script>
 // Sample defaults
 const DEFAULT_ADMIN_PASSWORD = 'admin123';
-const DEFAULT_PREMIUM_CODE = 'PREMIUM2025';
+// Removed DEFAULT_PREMIUM_CODE
 
 function storage(key, val){
   if(val===undefined) return JSON.parse(localStorage.getItem(key) || 'null');
@@ -186,7 +172,7 @@ function storage(key, val){
 
 function ensureDefaults(){
   if(!storage('adminPassword')) storage('adminPassword', DEFAULT_ADMIN_PASSWORD);
-  if(!storage('premiumCode')) storage('premiumCode', DEFAULT_PREMIUM_CODE);
+  // Removed premiumCode check
   if(!storage('results')){
     // sample data
     const sample = [
@@ -198,7 +184,8 @@ function ensureDefaults(){
   }
 }
 
-let session = {isAdmin:false, isPremium:false};
+// isPremium state is no longer needed
+let session = {isAdmin:false}; 
 
 function openAdminLogin(){
   document.getElementById('loginModal').classList.remove('hidden');
@@ -225,17 +212,7 @@ function logoutAdmin(){
   alert('Admin logged out');
 }
 
-function unlockPremium(){
-  const code = document.getElementById('premiumCode').value.trim();
-  const real = storage('premiumCode') || DEFAULT_PREMIUM_CODE;
-  if(code === real){
-    session.isPremium = true;
-    alert('Premium unlocked — full marks visible');
-    render();
-  } else {
-    alert('Wrong premium code');
-  }
-}
+// Removed unlockPremium function
 
 function getResults(){
   return storage('results') || [];
@@ -243,14 +220,15 @@ function getResults(){
 
 function render(){
   const query = document.getElementById('search').value.trim().toLowerCase();
-  const view = document.getElementById('viewSelect').value;
+  
+  // All results are now full results
+  const showFull = true; 
+
   const results = getResults().filter(r => {
     if(!query) return true;
     return r.id.toLowerCase().includes(query) || r.name.toLowerCase().includes(query) || (r.wing||'').toLowerCase().includes(query);
   });
   document.getElementById('count').textContent = results.length;
-
-  const showFull = (view==='premium' && session.isPremium) || session.isAdmin;
 
   // Define column headers and corresponding data attributes for mobile layout
   const headers = [
@@ -269,7 +247,7 @@ function render(){
 
   results.forEach((r, idx) => {
     const total = (r.marks || []).reduce((a,b)=>a+(Number(b)||0),0);
-    r.total = total; // Add total to the result object for easy access
+    r.total = total; 
     
     html += `<tr>`;
 
@@ -279,7 +257,7 @@ function render(){
       html += `<td data-label="${h.title}">${value}</td>`;
     });
 
-    // Render subjects column
+    // Render subjects column (always shown)
     if(showFull){
       const subjects = ((r.marks||[]).map((m,i)=>`S${i+1}: ${m}`).join(' | ') || '-');
       html += `<td data-label="Subjects">${subjects}</td>`;
@@ -297,7 +275,8 @@ function render(){
 
   html += '</tbody></table>';
   html += '<div style="margin-top:12px">';
-  if(showFull) html += '<button onclick="downloadCSV()">Download CSV</button> ';
+  // The download button is always present since showFull is true
+  html += '<button onclick="downloadCSV()">Download CSV</button> '; 
   html += '</div>';
 
   document.getElementById('tableWrap').innerHTML = html;
